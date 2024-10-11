@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Learning Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .chart-container { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Machine Learning Analysis</h1>
+        
+        <form id="uploadForm">
+            <input type="file" id="fileInput" accept=".xlsx, .xls">
+            <button type="submit">Upload</button>
+        </form>
+
+        <div id="columnSelection" style="display: none;">
+            <h2>Select Dependent Variable</h2>
+            <select id="dependentVariable"></select>
+            <button id="analyzeButton">Analyze</button>
+        </div>
+
+        <div id="results"></div>
+        <div class="chart-container">
+            <canvas id="comparisonChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('file', document.getElementById('fileInput').files[0]);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (data.columns) {
+                    populateColumnSelection(data.columns);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+
+        function populateColumnSelection(columns) {
+            const select = document.getElementById('dependentVariable');
+            select.innerHTML = columns.map(col => `<option value="${col}">${col}</option>`).join('');
+            document.getElementById('columnSelection').style.display = 'block';
+        }
+
+        document.getElementById('analyzeButton').addEventListener('click', async () => {
+            const dependentVariable = document.getElementById('dependentVariable').value;
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ dependent_variable: dependentVariable }),
+                });
+                const results = await response.json();
+                displayResults(results);
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+
+        function displayResults(results) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h2>Analysis Results</h2>';
+            
+            for (const [model, data] of Object.entries(results)) {
+                if (data.error) {
+                    resultsDiv.innerHTML += `<p>${model}: Error - ${data.error}</p>`;
+                } else {
+                    resultsDiv.innerHTML += `
+                        <h3>${model}</h3>
+                        <p>MSE: ${data.mse}</p>
+                        <p>R2 Score: ${data.r2_score}</p>
+                    `;
+                }
+            }
+
+            createComparisonChart(results);
+        }
+
+        function createComparisonChart(results) {
+            const ctx = document.getElementById('comparisonChart').getContext('2d');
+            const labels = Object.keys(results);
+            const mseData = labels.map(model => results[model].mse);
+            const r2Data = labels.map(model => results[model].r2_score);
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'MSE',
+                            data: mseData,
+                            backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                            borderColor: 'rgb(255, 99, 132)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'R2 Score',
+                            data: r2Data,
+                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                            borderColor: 'rgb(54, 162, 235)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Model Performance Comparison'
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
