@@ -3,31 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Machine Learning Analysis</title>
+    <title>Advanced Machine Learning Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; }
-        .chart-container { margin-top: 20px; }
+        @keyframes gradient {
+            0% {background-position: 0% 50%;}
+            50% {background-position: 100% 50%;}
+            100% {background-position: 0% 50%;}
+        }
+        .gradient-bg {
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>Machine Learning Analysis</h1>
-        
-        <form id="uploadForm">
-            <input type="file" id="fileInput" accept=".xlsx, .xls">
-            <button type="submit">Upload</button>
-        </form>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Advanced Machine Learning Analysis</h1>
+            <p class="text-xl text-gray-600">Upload your data, select variables, and get instant ML insights</p>
+        </header>
 
-        <div id="columnSelection" style="display: none;">
-            <h2>Select Dependent Variable</h2>
-            <select id="dependentVariable"></select>
-            <button id="analyzeButton">Analyze</button>
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-semibold mb-4">Data Upload</h2>
+            <form id="uploadForm" class="mb-4">
+                <div class="flex items-center justify-center w-full">
+                    <label for="fileInput" class="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                            <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Click to upload</span> or drag and drop</p>
+                            <p class="text-xs text-gray-500">XLSX or XLS file</p>
+                        </div>
+                        <input id="fileInput" type="file" class="hidden" accept=".xlsx, .xls" />
+                    </label>
+                </div>
+                <button type="submit" class="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-300">
+                    Upload and Analyze
+                </button>
+            </form>
         </div>
 
-        <div id="results"></div>
-        <div class="chart-container">
+        <div id="columnSelection" class="bg-white rounded-lg shadow-lg p-6 mb-8" style="display: none;">
+            <h2 class="text-2xl font-semibold mb-4">Select Dependent Variable</h2>
+            <select id="dependentVariable" class="block w-full p-2 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </select>
+            <button id="analyzeButton" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition duration-300">
+                Run Analysis
+            </button>
+        </div>
+
+        <div id="results" class="bg-white rounded-lg shadow-lg p-6 mb-8" style="display: none;">
+            <h2 class="text-2xl font-semibold mb-4">Analysis Results</h2>
+            <div id="resultContent" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Results will be dynamically inserted here -->
+            </div>
+        </div>
+
+        <div id="chartContainer" class="bg-white rounded-lg shadow-lg p-6" style="display: none;">
+            <h2 class="text-2xl font-semibold mb-4">Model Performance Comparison</h2>
             <canvas id="comparisonChart"></canvas>
         </div>
     </div>
@@ -36,7 +71,8 @@
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData();
-            formData.append('file', document.getElementById('fileInput').files[0]);
+            const fileInput = document.getElementById('fileInput');
+            formData.append('file', fileInput.files[0]);
 
             try {
                 const response = await fetch('/upload', {
@@ -46,16 +82,17 @@
                 const data = await response.json();
                 if (data.columns) {
                     populateColumnSelection(data.columns);
+                    document.getElementById('columnSelection').style.display = 'block';
                 }
             } catch (error) {
                 console.error('Error:', error);
+                alert('An error occurred while uploading the file. Please try again.');
             }
         });
 
         function populateColumnSelection(columns) {
             const select = document.getElementById('dependentVariable');
             select.innerHTML = columns.map(col => `<option value="${col}">${col}</option>`).join('');
-            document.getElementById('columnSelection').style.display = 'block';
         }
 
         document.getElementById('analyzeButton').addEventListener('click', async () => {
@@ -70,23 +107,33 @@
                 });
                 const results = await response.json();
                 displayResults(results);
+                document.getElementById('results').style.display = 'block';
+                document.getElementById('chartContainer').style.display = 'block';
             } catch (error) {
                 console.error('Error:', error);
+                alert('An error occurred during analysis. Please try again.');
             }
         });
 
         function displayResults(results) {
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = '<h2>Analysis Results</h2>';
+            const resultsDiv = document.getElementById('resultContent');
+            resultsDiv.innerHTML = '';
             
             for (const [model, data] of Object.entries(results)) {
                 if (data.error) {
-                    resultsDiv.innerHTML += `<p>${model}: Error - ${data.error}</p>`;
+                    resultsDiv.innerHTML += `
+                        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
+                            <p class="font-bold">${model}</p>
+                            <p>Error: ${data.error}</p>
+                        </div>
+                    `;
                 } else {
                     resultsDiv.innerHTML += `
-                        <h3>${model}</h3>
-                        <p>MSE: ${data.mse}</p>
-                        <p>R2 Score: ${data.r2_score}</p>
+                        <div class="bg-gray-100 p-4 rounded-lg">
+                            <h3 class="text-xl font-semibold mb-2">${model}</h3>
+                            <p class="mb-1"><span class="font-medium">MSE:</span> ${data.mse}</p>
+                            <p><span class="font-medium">R2 Score:</span> ${data.r2_score}</p>
+                        </div>
                     `;
                 }
             }

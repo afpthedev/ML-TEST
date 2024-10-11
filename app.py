@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -23,50 +23,29 @@ ALGORITHMS = {
     'Gradient Boosting Regressor': GradientBoostingRegressor(),
     'Support Vector Regressor': SVR(),
     'K-Nearest Neighbors Regressor': KNeighborsRegressor(),
-    'Neural Network (MLP)': MLPRegressor(max_iter=1000),
-    'AdaBoost Regressor': GradientBoostingRegressor()
+    'Neural Network (MLP)': MLPRegressor(max_iter=1000)
 }
-
-@app.route('/')
-def index():
-    return render_template('index.html')
 
 @app.route('/status', methods=['GET'])
 def status():
     return jsonify({'status': 'Çalışıyor'})
 
-# Dosya yükleme endpointi
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({'error': 'Dosya bulunamadı.'}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'Dosya seçilmedi.'}), 400
-
-    try:
-        df = pd.read_excel(file)
-        columns = df.columns.tolist()
-        df.to_excel('uploaded_file.xlsx', index=False)
-        return jsonify({'columns': columns})
-    except Exception as e:
-        return jsonify({'error': f'Dosyayı işlerken bir hata oluştu: {str(e)}'}), 500
-
-# Çoklu makine öğrenmesi modeli analiz endpointi
+# Veri ve analiz işlemlerini birleştirip tek endpoint'e çeken kod
 @app.route('/analyze', methods=['POST'])
 def analyze_data():
-    data = request.get_json()
-    dependent_variable = data.get('dependent_variable')
+    file = request.files.get('file')
+    dependent_variable = request.form.get('dependent_variable')
 
-    if not dependent_variable:
-        return jsonify({'error': 'Bağımlı değişken belirtilmedi.'}), 400
+    if not file or not dependent_variable:
+        return jsonify({'error': 'Dosya veya bağımlı değişken eksik.'}), 400
 
     try:
-        df = pd.read_excel('uploaded_file.xlsx')
+        # Dosya işlemlerini alıp veri çerçevesine dönüştürme
+        df = pd.read_excel(file)
         if dependent_variable not in df.columns:
             return jsonify({'error': f'Bağımlı değişken {dependent_variable} veri setinde bulunamadı.'}), 400
 
+        # Kategorik değişkenleri dönüştürme ve modelleme için veri hazırlığı
         df = pd.get_dummies(df, drop_first=True)
         X = df.drop(columns=[dependent_variable])
         y = df[dependent_variable]
@@ -84,9 +63,7 @@ def analyze_data():
 
                 results[model_name] = {
                     'mse': round(mse, 4),
-                    'r2_score': round(r2, 4),
-                    'predictions': predictions.tolist(),
-                    'actual_values': y_test.tolist()
+                    'r2_score': round(r2, 4)
                 }
             except Exception as e:
                 results[model_name] = {'error': str(e)}
@@ -94,7 +71,6 @@ def analyze_data():
         return jsonify(results)
     except Exception as e:
         error_message = f'Analiz sırasında bir hata oluştu: {str(e)}'
-        print(error_message)
         return jsonify({'error': error_message}), 500
 
 if __name__ == '__main__':
